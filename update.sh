@@ -76,7 +76,16 @@ main() {
         log_warn "vue-frontend 目录不存在，跳过前端构建"
     fi
 
-    # 7. 重启服务
+    # 7. 检查打卡同步密钥
+    ENV_FILE="$PROJECT_DIR/.env"
+    if [ -f "$ENV_FILE" ]; then
+        log_info "检测到打卡同步密钥文件: $ENV_FILE"
+    else
+        log_warn "未检测到 $PROJECT_DIR/.env，小程序 login 接口将返回 401"
+        log_warn "该文件含密钥、不入库，请在服务器执行 deploy_bt.sh 生成"
+    fi
+
+    # 8. 重启服务
     log_info "重启 Gunicorn 服务..."
     systemctl restart hub
     log_info "Gunicorn 服务已重启"

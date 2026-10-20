@@ -148,6 +148,36 @@ print('管理员账号创建成功:', user.username)
     cd "$SCRIPT_DIR"
 }
 
+setup_env_file() {
+    log_info "配置打卡同步密钥（.env）..."
+
+    ENV_FILE="$PROJECT_DIR/.env"
+
+    if [ -f "$ENV_FILE" ]; then
+        log_info "已存在 $ENV_FILE，跳过（如需修改请手动编辑后重启服务）"
+        return
+    fi
+
+    echo "打卡小助手云同步需要微信小程序 AppID / AppSecret。"
+    echo "AppSecret 为可选项：留空则 login 接口暂不可用，其余接口不受影响。"
+    read -p "请输入小程序 AppID（回车使用默认 wxf7530967009df729）: " WX_APPID
+    if [ -z "$WX_APPID" ]; then
+        WX_APPID="wxf7530967009df729"
+    fi
+    read -s -p "请输入小程序 AppSecret（回车跳过）: " WX_SECRET
+    echo
+
+    umask 077
+    cat > "$ENV_FILE" <<EOF
+# 打卡小助手云同步密钥（本文件不入库、不进 git）
+WX_APPID=$WX_APPID
+WX_SECRET=$WX_SECRET
+EOF
+    chmod 600 "$ENV_FILE"
+    log_info "已写入 $ENV_FILE（权限 600）"
+    log_warn "该文件需与运行服务的账号同属主，请确保服务以 root 运行"
+}
+
 detect_nginx() {
     NGINX_BIN=""
     if command -v nginx &> /dev/null; then
@@ -301,6 +331,7 @@ main() {
     run_migrations
     collect_static
     check_admin_user
+    setup_env_file
     generate_nginx_config
     show_deploy_info
 }

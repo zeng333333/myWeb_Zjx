@@ -143,6 +143,18 @@ web/
 | `/api/store/tools/<id>/` | DELETE | 删除工具 | 管理员 |
 | `/api/store/tools/<id>/download/` | GET | 工具下载 | 公开 |
 
+### 打卡云同步（checkin）
+
+小程序端把本地数据整包推送到服务端，服务端按版本号存取、防覆盖；服务端不解析业务字段。
+
+| API 路径 | 方法 | 说明 | 认证 |
+| --- | --- | --- | --- |
+| `/api/checkin/login/` | POST | code 换 openid 并签发 token（7 天） | 公开 |
+| `/api/checkin/sync/pull/` | GET | 拉取当前用户全量快照 | 需 token |
+| `/api/checkin/sync/push/` | POST | 整包覆盖上传（带 baseVersion，冲突返回 409） | 需 token |
+
+> 需在运行环境配置 `WX_APPID` / `WX_SECRET` 环境变量；小程序 request 域名上线前需 HTTPS + 已备案域名。
+
 ## 前端路由
 
 | 路径 | 组件 | 说明 | 权限 |

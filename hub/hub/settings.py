@@ -10,10 +10,36 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _load_env_file(path):
+    """将 .env 文件中的键值对注入进程环境变量（已存在的变量不覆盖）。
+
+    用于让服务进程（Gunicorn / runserver）在启动时读取部署脚本生成的密钥文件，
+    从而无需手动修改 systemd 或宝塔 Supervisor 的环境配置。
+
+    Args:
+        path (Path): .env 文件路径；文件不存在时直接返回。
+
+    Returns:
+        None
+    """
+    if not path.exists():
+        return
+    for raw_line in path.read_text(encoding='utf-8').splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, _, value = line.partition('=')
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+_load_env_file(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
@@ -42,6 +68,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'home',
     'store',
+    'checkin',
 ]
 
 MIDDLEWARE = [
@@ -158,6 +185,13 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
 }
+
+# 打卡小助手云同步（checkin app）
+# AppSecret 只从环境变量读取，绝不写死进代码或提交到 git
+WECHAT_APPID = os.environ.get('WX_APPID', 'wxf7530967009df729')
+WECHAT_SECRET = os.environ.get('WX_SECRET', '')
+CHECKIN_PAYLOAD_MAX_BYTES = 2 * 1024 * 1024
+CHECKIN_TOKEN_LIFETIME_DAYS = 7
 
 LOGGING = {
     'version': 1,
