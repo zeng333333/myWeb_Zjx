@@ -41,6 +41,10 @@ def _load_env_file(path):
 
 _load_env_file(BASE_DIR / '.env')
 
+# 确保日志目录存在（git 不跟踪空目录，服务器首次拉代码后需自动创建，
+# 否则 FileHandler 在 Django 启动时会抛 FileNotFoundError）
+(BASE_DIR / 'logs').mkdir(parents=True, exist_ok=True)
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -196,9 +200,28 @@ CHECKIN_TOKEN_LIFETIME_DAYS = 7
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'checkin': {
+            'format': '[{asctime}] {levelname} {message}',
+            'style': '{',
+        },
+    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
+        },
+        'checkin_file': {
+            'class': 'logging.FileHandler',
+            'filename': str(BASE_DIR / 'logs' / 'checkin.log'),
+            'encoding': 'utf-8',
+            'formatter': 'checkin',
+        },
+    },
+    'loggers': {
+        'checkin': {
+            'handlers': ['console', 'checkin_file'],
+            'level': 'DEBUG',
+            'propagate': False,
         },
     },
     'root': {

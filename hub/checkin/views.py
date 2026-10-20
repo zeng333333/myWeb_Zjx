@@ -1,5 +1,6 @@
 """checkin 云同步接口：login / sync.pull / sync.push。"""
 import json
+import logging
 import time
 
 from django.conf import settings
@@ -15,6 +16,8 @@ from .models import SyncSnapshot, WeChatUser
 from .serializers import LoginSerializer, PushSerializer
 from .throttles import IPRateThrottle, OpenidRateThrottle
 from .wechat import WeChatAPIError, jscode2session
+
+logger = logging.getLogger('checkin')
 
 
 def _now_ms():
@@ -69,10 +72,12 @@ class WeChatLoginView(CheckinAPIView):
         Returns:
             Response: 成功返回 ``{token, expireAt}``；失败返回统一错误体。
         """
+        logger.info('login 收到的请求体: %s', json.dumps(request.data, ensure_ascii=False, default=str))
         serializer = LoginSerializer(data=request.data)
         if not serializer.is_valid():
             return error_response('invalid_code', 'code 不能为空', status.HTTP_400_BAD_REQUEST)
         code = serializer.validated_data['code']
+        logger.info('login 实际发给微信的 js_code: %r', code)
 
         try:
             data = jscode2session(code)
