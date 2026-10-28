@@ -4,6 +4,14 @@
     <main>
       <router-view />
     </main>
+    <footer class="footer">
+      <a
+        href="https://beian.miit.gov.cn/"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="icp-link"
+      >湘ICP备2026047657号</a>
+    </footer>
   </div>
 </template>
 
@@ -28,5 +36,22 @@ onMounted(() => {
 
 main {
   flex: 1;
+}
+
+.footer {
+  border-top: 1px solid #e0e0e0;
+  padding: 16px 0;
+  text-align: center;
+}
+
+.icp-link {
+  font-size: 13px;
+  color: #999999;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.icp-link:hover {
+  color: #1a1a1a;
 }
 </style>
