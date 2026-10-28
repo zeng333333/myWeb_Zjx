@@ -366,4 +366,4 @@ main() {
     show_deploy_info
 }
 
-main
+main "$@"
