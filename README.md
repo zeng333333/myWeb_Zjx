@@ -220,14 +220,16 @@ nginx -c /path/to/web/nginx/conf/nginx.conf
 ### Linux 生产环境（宝塔面板）
 
 ```bash
-cd /root/zjx
-git clone https://github.com/cn33331/myWeb_Zjx.git web
-cd web
+cd /www/wwwroot
+git clone https://github.com/cn33331/myWeb_Zjx.git zjx
+cd zjx
 
 # 交互式部署（自动创建虚拟环境、安装依赖、构建前端、迁移数据库、生成 Nginx 配置）
 chmod +x deploy_bt.sh
 ./deploy_bt.sh
 ```
+
+> **项目目录不要放在 `/root` 下**。Nginx 以 `www` 用户运行，读不到 `/root` 内的静态文件，会导致前端页面返回 500（`rewrite or internal redirection cycle`）。推荐放在 `/www/wwwroot/`。
 
 `deploy_bt.sh` 会交互式引导完成以下步骤：
 
@@ -250,8 +252,8 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/root/zjx/web/web/hub
-ExecStart=/root/zjx/web/web/venv/bin/gunicorn hub.wsgi:application --bind 127.0.0.1:8000 --workers 4
+WorkingDirectory=/www/wwwroot/zjx/hub
+ExecStart=/www/wwwroot/zjx/venv/bin/gunicorn hub.wsgi:application --bind 127.0.0.1:8000 --workers 4
 Restart=always
 RestartSec=5
 
@@ -264,8 +266,8 @@ systemctl start hub
 systemctl enable hub
 
 # 方式二：宝塔面板 Supervisor 插件
-# 启动命令: /root/zjx/web/web/venv/bin/gunicorn hub.wsgi:application --bind 127.0.0.1:8000 --workers 4
-# 启动目录: /root/zjx/web/web/hub
+# 启动命令: /www/wwwroot/zjx/venv/bin/gunicorn hub.wsgi:application --bind 127.0.0.1:8000 --workers 4
+# 启动目录: /www/wwwroot/zjx/hub
 
 # 重载 Nginx
 /www/server/nginx/sbin/nginx -t && /www/server/nginx/sbin/nginx -s reload
@@ -276,18 +278,55 @@ systemctl enable hub
 ### 代码更新流程
 
 ```bash
-cd /root/zjx/web/web
+cd /www/wwwroot/zjx
 
 # 一键更新（拉取代码、检查依赖、迁移数据库、构建前端、重启服务）
 chmod +x update.sh
 ./update.sh
 ```
 
+`update.sh` 只负责**代码层面**的更新：拉代码 → 装依赖 → 迁移 → 收集静态文件 → 构建前端 → 重启 `hub` 服务。
+
+它**不会重建 Nginx 配置**。以下情况需要额外执行一次 `--nginx-only`：
+
+- 修改了域名 / 服务器公网IP
+- 新增或更换 SSL 证书
+- 调整了 Admin IP 白名单
+- 首次配置 HTTPS
+
+```bash
+cd /www/wwwroot/zjx
+./deploy_bt.sh --nginx-only
+```
+
+该模式会跳过依赖安装、前端构建和数据库迁移，只重建 Nginx 配置并重载，几秒完成。
+
 | 脚本 | 用途 | 模式 |
 | --- | --- | --- |
 | `deploy_bt.sh` | 首次部署 | 交互式 |
 | `deploy_bt.sh --nginx-only` | 仅重建 Nginx 配置并重载 | 交互式 |
 | `update.sh` | 日常更新 | 非交互式 |
+
+更新后的验证：
+
+```bash
+# 服务状态
+systemctl status hub --no-pager | head -10
+
+# 前端
+curl -I 'https://你的域名/'
+
+# 后端链路（期望 401，不是 502/404/500）
+curl -I 'https://你的域名/api/checkin/sync/pull/'
+```
+
+失败时按顺序看三处日志：
+
+```bash
+journalctl -u hub -n 60 --no-pager        # Django 异常栈 / Gunicorn 启动错误
+tail -30 /www/wwwlogs/hub_error.log       # Nginx 层（反代、权限、路径）
+tail -50 /www/wwwroot/zjx/hub/logs/checkin.log   # 业务日志（小程序联调）
+```
 
 ### SSL 证书配置（HTTPS）
 
@@ -329,7 +368,7 @@ rm -rf <域名>_nginx
 **② 重建 Nginx 配置**
 
 ```bash
-cd /root/zjx/web/web
+cd /www/wwwroot/zjx
 ./update.sh                      # 拉取最新代码
 ./deploy_bt.sh --nginx-only      # 重建配置并自动重载
 ```
