@@ -236,7 +236,7 @@ chmod +x deploy_bt.sh
 3. 安装前端依赖并构建
 4. 执行数据库迁移与静态文件收集
 5. 检查/创建管理员账号
-6. 生成 Nginx 配置（含 Admin IP 白名单设置）
+6. 生成 Nginx 配置（含 Admin IP 白名单设置，检测到证书时自动启用 443）
 
 部署完成后，按脚本提示配置 Gunicorn 守护进程：
 
@@ -286,7 +286,90 @@ chmod +x update.sh
 | 脚本 | 用途 | 模式 |
 | --- | --- | --- |
 | `deploy_bt.sh` | 首次部署 | 交互式 |
+| `deploy_bt.sh --nginx-only` | 仅重建 Nginx 配置并重载 | 交互式 |
 | `update.sh` | 日常更新 | 非交互式 |
+
+### SSL 证书配置（HTTPS）
+
+微信小程序要求 `request` 域名必须为 HTTPS（TLS 1.2+、443 端口、不能带端口号），因此生产环境必须配置证书。
+
+**① 上传证书到服务器**
+
+从腾讯云 / 阿里云 SSL 控制台下载 **Nginx 格式**证书包，用宝塔「文件」上传到 `/www/server/panel/vhost/cert/`，然后执行：
+
+```bash
+mkdir -p /www/server/panel/vhost/cert/hub
+cd /www/server/panel/vhost/cert/hub
+
+# 解压证书包（文件名以实际下载的域名为准）
+unzip -o /www/server/panel/vhost/cert/<域名>_nginx.zip
+
+# 改名为 Nginx 约定名称
+mv <域名>_nginx/<域名>_bundle.crt fullchain.pem
+mv <域名>_nginx/<域名>.key     privkey.pem
+
+chmod 755 /www/server/panel/vhost/cert/hub
+chmod 644 fullchain.pem
+chmod 600 privkey.pem
+
+rm -rf <域名>_nginx
+```
+
+证书包内文件对应关系：
+
+| 包内文件 | 目标文件名 | 说明 |
+| --- | --- | --- |
+| `<域名>_bundle.crt` | `fullchain.pem` | 服务器证书 + 中间证书（完整链，**必须用这个**） |
+| `<域名>.key` | `privkey.pem` | 私钥，权限 600 |
+| `<域名>_bundle.pem` | 不需要 | 与 `.crt` 内容相同 |
+| `<域名>.csr` | 不需要 | 证书签名请求，仅申请时使用 |
+
+> **证书文件严禁提交到 git**，私钥一旦入库即视为泄露。它们以未跟踪文件形式存在于服务器，`update.sh` 的 `git reset --hard` 不会删除。
+
+**② 重建 Nginx 配置**
+
+```bash
+cd /root/zjx/web/web
+./update.sh                      # 拉取最新代码
+./deploy_bt.sh --nginx-only      # 重建配置并自动重载
+```
+
+脚本会自动检测 `CERT_DIR`（默认 `/www/server/panel/vhost/cert/hub`）下的 `fullchain.pem` 与 `privkey.pem`：
+
+- 存在 → 生成 `listen 443 ssl` 配置，输出「检测到 SSL 证书，将同时启用 443 端口」
+- 不存在 → 仅生成 HTTP 配置并给出提示，站点仍可正常访问
+
+交互提示按如下填写：
+
+```
+请输入服务器公网IP: <公网IP>
+请输入站点域名(可选): www.example.com example.com   # 多个域名用空格分隔
+请输入允许访问 Admin 的 IP 地址: <你的公网IP>
+```
+
+**③ 放行 443 端口**
+
+云厂商控制台 → 安全组 → 入方向规则添加 `443/TCP`。仅开服务器本地防火墙不够，安全组不放行时外部依然无法连接。
+
+**④ 验证**
+
+```bash
+# 确认实际下发的证书正确
+echo | openssl s_client -connect www.example.com:443 -servername www.example.com 2>/dev/null \
+  | openssl x509 -noout -subject -dates
+
+# 页面可访问
+curl -I https://www.example.com/
+
+# 后端链路（无 token 应返回 401 而非 502/404）
+curl -I https://www.example.com/api/checkin/sync/pull/
+```
+
+**⑤ 证书续期**
+
+免费 DV 证书有效期通常为 **90 天**，云厂商不自动续签。到期前重新申请、覆盖 `fullchain.pem` / `privkey.pem`，再执行一次 `./deploy_bt.sh --nginx-only` 即可。
+
+> 也可改用 `acme.sh` 自动续签（自带 cron，换证后自动 reload Nginx），避免手动维护。
 
 ## 关键配置
 

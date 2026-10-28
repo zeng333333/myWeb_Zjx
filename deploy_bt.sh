@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$SCRIPT_DIR/hub"
 VENV_DIR="$SCRIPT_DIR/venv"
 PROJECT_NAME="hub"
+CERT_DIR="${CERT_DIR:-/www/server/panel/vhost/cert/${PROJECT_NAME}}"
 
 PYTHON_BIN=""
 PIP_INDEX_URL="${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
@@ -213,10 +214,28 @@ generate_nginx_config() {
     else
         log_warn "未设置 Admin IP 白名单，所有 IP 均可访问 /admin/"
     fi
-    
+
+    SSL_CONF=""
+    SSL_CERT="$CERT_DIR/fullchain.pem"
+    SSL_KEY="$CERT_DIR/privkey.pem"
+    if [ -f "$SSL_CERT" ] && [ -f "$SSL_KEY" ]; then
+        log_info "检测到 SSL 证书，将同时启用 443 端口"
+        SSL_CONF="
+    listen 443 ssl default_server;
+    listen [::]:443 ssl;
+    ssl_certificate     $SSL_CERT;
+    ssl_certificate_key $SSL_KEY;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_session_cache   shared:SSL:10m;"
+    else
+        log_warn "未检测到 SSL 证书（$CERT_DIR），本次仅生成 HTTP 配置"
+        log_warn "上传 fullchain.pem / privkey.pem 后重跑 ./deploy_bt.sh --nginx-only 即可启用 HTTPS"
+    fi
+
     NGINX_CONF="server {
     listen 80 default_server;
-    listen [::]:80;
+    listen [::]:80;${SSL_CONF}
     server_name $SERVER_IP $SITE_DOMAIN localhost 127.0.0.1 _;
 
     charset utf-8;
@@ -301,6 +320,7 @@ show_deploy_info() {
     echo "项目路径: $SCRIPT_DIR"
     echo "虚拟环境: $VENV_DIR"
     echo "Nginx 配置: /www/server/panel/vhost/nginx/${PROJECT_NAME}.conf"
+    echo "SSL 证书目录: $CERT_DIR"
     echo
     echo "配置 Supervisor 守护进程（宝塔面板）："
     echo "1. 登录宝塔面板：http://服务器IP:8888"
@@ -322,6 +342,16 @@ main() {
     echo "  Hub 平台 - 服务器本地部署脚本"
     echo "=========================================="
     echo
+
+    if [ "$1" = "--nginx-only" ]; then
+        log_info "仅重建 Nginx 配置（跳过依赖安装、前端构建、数据库迁移）"
+        generate_nginx_config
+        if [ -n "$NGINX_BIN" ]; then
+            $NGINX_BIN -s reload
+            log_info "Nginx 已重载"
+        fi
+        return
+    fi
 
     check_env
     check_venv
