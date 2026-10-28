@@ -38,3 +38,9 @@ class PushSerializer(serializers.Serializer):
             if key not in value or not isinstance(value[key], expected):
                 raise serializers.ValidationError(f'payload 字段 {key} 缺失或类型不合法')
         return value
+
+
+class SpaceJoinSerializer(serializers.Serializer):
+    """``POST /api/checkin/space/join/`` 的请求体。"""
+
+    code = serializers.RegexField(r'^\d{6}$')

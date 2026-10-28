@@ -46,3 +46,17 @@ class IPRateThrottle(SimpleRateThrottle):
             str: 限流键。
         """
         return self.cache_format % {'scope': self.scope, 'ident': self.get_ident(request)}
+
+
+class SpaceCodeThrottle(OpenidRateThrottle):
+    """生成绑定码限流，每 openid 每分钟 1 次。"""
+
+    scope = 'checkin_space_code'
+    rate = '1/min'
+
+
+class SpaceJoinThrottle(OpenidRateThrottle):
+    """加入空间限流，每 openid 每分钟 5 次，防止爆破 6 位绑定码。"""
+
+    scope = 'checkin_space_join'
+    rate = '5/min'

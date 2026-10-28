@@ -152,7 +152,12 @@ web/
 | `/api/checkin/login/` | POST | code 换 openid 并签发 token（7 天） | 公开 |
 | `/api/checkin/sync/pull/` | GET | 拉取当前用户全量快照 | 需 token |
 | `/api/checkin/sync/push/` | POST | 整包覆盖上传（带 baseVersion，冲突返回 409） | 需 token |
+| `/api/checkin/space/` | GET | 查询当前用户所在数据空间（spaceId / memberCount / isOwner） | 需 token |
+| `/api/checkin/space/code/` | POST | 生成一次性绑定码（6 位数字，10 分钟有效，同空间重复生成旧码作废） | 需 token |
+| `/api/checkin/space/join/` | POST | 凭绑定码加入空间（只改 openid→space 映射，不动快照） | 需 token |
+| `/api/checkin/space/leave/` | POST | 退出空间（新建单人空间并复制当前快照，退出不丢数据） | 需 token |
 
+> V2 起数据归属从 openid 提升为 space_id：两个微信号加入同一空间即共用一份快照；V1 客户端不受影响。
 > 需在运行环境配置 `WX_APPID` / `WX_SECRET` 环境变量；小程序 request 域名上线前需 HTTPS + 已备案域名。
 
 ## 前端路由
