@@ -11,6 +11,13 @@
         rel="noopener noreferrer"
         class="icp-link"
       >湘ICP备2026047657号</a>
+      <span class="footer-divider">|</span>
+      <a
+        href="https://www.12321.cn/"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="icp-link"
+      >违法和不良信息举报</a>
     </footer>
   </div>
 </template>
@@ -53,5 +60,11 @@ main {
 
 .icp-link:hover {
   color: #1a1a1a;
+}
+
+.footer-divider {
+  margin: 0 8px;
+  font-size: 13px;
+  color: #cccccc;
 }
 </style>
